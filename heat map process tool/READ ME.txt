@@ -1,0 +1,1 @@
+这一组python代码可以用于生成heatmap，没有设计批量生成，需要自己更改文件，preprocess用于拼接文件，去除光谱的重复成分，hmsimple用于产生积分heatmap，peak。。。用于产生峰参数的heatmap，需要自行调整拟合所用的函数，以及拟合的容许限度，注释中都有提到。
