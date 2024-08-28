@@ -1,4 +1,4 @@
-('C:\\Users\\xzqte\\Desktop\\Re-doped\\build\\Justplot\\PYZ-00.pyz',
+('C:\\Users\\xzqte\\Desktop\\Re-doped\\build\\Justplot_bias\\PYZ-00.pyz',
  [('PIL',
    'c:\\Users\\xzqte\\Desktop\\Re-doped\\.venv\\Lib\\site-packages\\PIL\\__init__.py',
    'PYMODULE'),

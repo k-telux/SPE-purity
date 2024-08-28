@@ -2,7 +2,7 @@
 
 
 a = Analysis(
-    ['Justplot.py'],
+    ['Justplot_bias.py'],
     pathex=[],
     binaries=[],
     datas=[],
@@ -22,7 +22,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='Justplot',
+    name='Justplot_bias',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

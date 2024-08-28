@@ -22,7 +22,8 @@ def read_data(file_path):
     
     return wavenumbers, intensities
 
-def plot_data(wavenumbers, intensities, label_type="Raman", title="Wavenumber vs Intensity", color="blue", output_folder="."):
+def plot_data(wavenumbers, intensities, label_type="Raman", title="Wavenumber vs Intensity", color="red", output_folder=".", bias=0.0):
+    
     plt.figure(figsize=(10, 6))
     
     if label_type == "Raman":
@@ -33,8 +34,8 @@ def plot_data(wavenumbers, intensities, label_type="Raman", title="Wavenumber vs
         ylabel = "Intensity"
     else:
         raise ValueError("Invalid label_type. Choose 'Raman' or 'Energy'.")
-    
-    plt.plot(wavenumbers, intensities, color=color, label="Original Data")
+    adjusted_intensities = [i - bias for i in intensities]
+    plt.plot(wavenumbers, adjusted_intensities, color=color, label="Original Data")
     
     for curve in curve_params_buffer:
         curve_type, params = curve['type'], curve['params']
@@ -50,8 +51,8 @@ def plot_data(wavenumbers, intensities, label_type="Raman", title="Wavenumber vs
         else:
             raise ValueError("Invalid curve type. Choose 'Gaussian', 'Lorentz', or 'Voigt'.")
         
-        plt.plot(x, y, label=f"{curve_type} Curve", linestyle='--')
-        plt.fill_between(x, y, alpha=0.3)
+        plt.plot(x, y, label=f"{curve_type} Curve", linestyle='-')
+        plt.fill_between(x, y, alpha=0.5)
     
     plt.title(title)
     plt.xlabel(xlabel)
@@ -78,7 +79,9 @@ def generate_plots():
     files = file_list.get(0, tk.END)
     output_folder = output_folder_entry.get()
     label_type = label_type_var.get()
-    color = color_entry.get()
+    color = color_entry.get() or "red"
+    bias = float(bias_entry.get() or 0.0)
+    plot_in_one = plot_in_one_var.get()
     
     if not files:
         messagebox.showerror("Error", "No files selected")
@@ -88,11 +91,29 @@ def generate_plots():
         messagebox.showerror("Error", "No output folder selected")
         return
     
-    for file in files:
-        wavenumbers, intensities = read_data(file)
-        file_name = os.path.basename(file)
-        title = f"{file_name} - {label_type}"
-        plot_data(wavenumbers, intensities, label_type=label_type, title=title, color=color, output_folder=output_folder)
+    if plot_in_one and len(files) > 1:
+        plt.figure(figsize=(10, 6))
+        for file in files:
+            wavenumbers, intensities = read_data(file)
+            adjusted_intensities = [i - bias for i in intensities]
+            file_name = os.path.splitext(os.path.basename(file))[0] 
+            plt.plot(wavenumbers, adjusted_intensities, label=file_name)
+        
+        plt.title("All Data - " + label_type)
+        plt.xlabel("Wavenumber (cm-1)" if label_type == "Raman" else "Energy (eV)")
+        plt.ylabel("Intensity")
+        plt.legend()
+        plt.grid(True)
+        
+        output_path = os.path.join(output_folder, "All.png")
+        plt.savefig(output_path)
+        plt.close()
+    else:
+        for file in files:
+            wavenumbers, intensities = read_data(file)
+            file_name = os.path.splitext(os.path.basename(file))[0]  
+            title = f"{file_name} - {label_type}"
+            plot_data(wavenumbers, intensities, label_type=label_type, title=title, color=color, output_folder=output_folder, bias=bias)
     
     messagebox.showinfo("Success", "Plots generated successfully")
 
@@ -114,11 +135,9 @@ def open_curve_window():
 
     tk.Button(curve_window, text="Add Curve", command=lambda: add_curve_to_buffer(file_var.get(), curve_type_var.get(), params_entry.get(), curve_listbox), bg="lightblue").grid(row=3, column=0, columnspan=2, padx=10, pady=20)
 
-    # 添加列表框显示缓冲区中的曲线参数
     curve_listbox = tk.Listbox(curve_window, width=80, height=10)
     curve_listbox.grid(row=4, column=0, columnspan=2, padx=10, pady=5)
 
-    # 添加修改和删除按钮
     tk.Button(curve_window, text="Modify Curve", command=lambda: modify_curve(curve_listbox), bg="lightyellow").grid(row=5, column=0, padx=10, pady=5)
     tk.Button(curve_window, text="Delete Curve", command=lambda: delete_curve(curve_listbox), bg="lightcoral").grid(row=5, column=1, padx=10, pady=5)
 
@@ -126,13 +145,19 @@ def gaussian(x, amp, cen, wid):
     return amp * np.exp(-(x-cen)**2 / (2*wid**2))
 
 def lorentzian(x, amp, cen, wid):
-    return amp * wid**2 / ((x-cen)**2 + wid**2)
+    return amp * wid**2 / (4*(x-cen)**2 + wid**2)
 
 def voigt(x, amp, cen, sigma, gamma):
     z = ((x-cen) + 1j*gamma) / (sigma * np.sqrt(2))
     return amp * np.real(wofz(z)) / (sigma * np.sqrt(2*np.pi))
 
-def add_curve_to_buffer(file_path, curve_type, params, curve_listbox):
+def add_curve_to_buffer(file_path, curve_type, params, curve_listbox, curve_bias=0.0):
+    try:
+        curve_bias = float(curve_bias)
+    except ValueError:
+        messagebox.showerror("Error", "Bias must be a float value")
+        return
+    
     curve_params_buffer.append({'file': file_path, 'type': curve_type, 'params': params})
     curve_listbox.insert(tk.END, f"{curve_type} Curve: {params}")
     messagebox.showinfo("Success", f"{curve_type} curve parameters added to buffer")
@@ -178,23 +203,19 @@ def delete_curve(curve_listbox):
     curve_listbox.delete(selected_index)
     messagebox.showinfo("Success", "Curve parameters deleted successfully")
 
-# 创建主窗口
 root = tk.Tk()
 root.title("Spectrum Plot Generator")
 
-# 文件选择
 tk.Label(root, text="Select txt files:").grid(row=0, column=0, padx=10, pady=5)
 tk.Button(root, text="Select Files", command=select_files, bg="lightgreen").grid(row=0, column=1, padx=10, pady=5)
 file_list = tk.Listbox(root, selectmode=tk.MULTIPLE, width=50)
 file_list.grid(row=1, column=0, columnspan=2, padx=10, pady=5)
 
-# 输出文件夹选择
 tk.Label(root, text="Select output folder:").grid(row=2, column=0, padx=10, pady=5)
 output_folder_entry = tk.Entry(root, width=50)
 output_folder_entry.grid(row=3, column=0, padx=10, pady=5)
 tk.Button(root, text="Select Folder", command=select_output_folder, bg="lightgreen").grid(row=3, column=1, padx=10, pady=5)
 
-# 绘图参数
 tk.Label(root, text="Label type:").grid(row=4, column=0, padx=10, pady=5)
 label_type_var = tk.StringVar(value="Raman")
 tk.OptionMenu(root, label_type_var, "Raman", "PL").grid(row=4, column=1, padx=10, pady=5)
@@ -207,11 +228,16 @@ tk.Label(root, text="Color:").grid(row=6, column=0, padx=10, pady=5)
 color_entry = tk.Entry(root, width=50)
 color_entry.grid(row=6, column=1, padx=10, pady=5)
 
-# 生成图像按钮
-tk.Button(root, text="Generate Plots", command=generate_plots, bg="lightblue").grid(row=7, column=0, columnspan=2, padx=10, pady=20)
+tk.Label(root, text="Bias:").grid(row=7, column=0, padx=10, pady=5)
+bias_entry = tk.Entry(root, width=50)
+bias_entry.grid(row=7, column=1, padx=10, pady=5)
 
-# 在生成图像按钮下方添加一个按钮，用于打开子窗口
-tk.Button(root, text="Add Curve", command=open_curve_window, bg="lightblue").grid(row=8, column=0, columnspan=2, padx=10, pady=20)
+plot_in_one_var = tk.BooleanVar()
+tk.Checkbutton(root, text="Plot all in one", variable=plot_in_one_var).grid(row=8, column=0, columnspan=2, padx=10, pady=5)
+
+tk.Button(root, text="Generate Plots", command=generate_plots, bg="lightblue").grid(row=9, column=0, columnspan=2, padx=10, pady=20)
+
+tk.Button(root, text="Add Curve", command=open_curve_window, bg="lightblue").grid(row=10, column=0, columnspan=2, padx=10, pady=20)
 
 # 运行主循环
 root.mainloop()
