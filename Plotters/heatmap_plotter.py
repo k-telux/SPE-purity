@@ -9,6 +9,7 @@ from tkinter import filedialog, messagebox, ttk
 from scipy.optimize import curve_fit
 from scipy.special import wofz
 from scipy.fft import fft, ifft
+import math
 
 def gaussian(x, amp, cen, wid):
     return amp * np.exp(-(x-cen)**2 / (2*wid**2))
@@ -132,7 +133,7 @@ def on_click(event, heatmap_data, df, plot_type, perform_fitting, selected_fit):
     else:
         print(f"Click out of data bounds (col: {col}, row: {row}). Ignoring click.")
 
-def plot_heatmap(data_folder, txt_files, wavenumber_min=1.6, wavenumber_max=2.2, plot_type='PL', output_folder=None, usernormalized=True, perform_fitting=True, selected_fit=None):
+def plot_heatmap(data_folder, txt_files, wavenumber_min=1.6, wavenumber_max=2.2, plot_type='PL', output_folder=None, usernormalized=True, perform_fitting=True, selected_fit=None,log_scale=False):
     for txt_file in txt_files:
         data_path = os.path.join(data_folder, txt_file)
         data = np.loadtxt(data_path, skiprows=1)
@@ -149,6 +150,8 @@ def plot_heatmap(data_folder, txt_files, wavenumber_min=1.6, wavenumber_max=2.2,
 
         heatmap_data = df.groupby(['x', 'y'])['intensity'].sum().unstack()
         unormalized_data = heatmap_data.copy()
+        if log_scale:
+            heatmap_data = np.log1p(heatmap_data)
         heatmap_data = (heatmap_data - heatmap_data.min().min()) / (heatmap_data.max().max() - heatmap_data.min().min())
 
         plt.figure(figsize=(10, 8))
@@ -207,9 +210,10 @@ def run_plot():
     output_folder = entry_output_folder.get()
     use_normalized = var_normalize.get()
     selected_fit = var_fit_type.get()
+    log_scale = var_log.get()
 
     try:
-        plot_heatmap(data_folder, txt_files, wavenumber_min, wavenumber_max, plot_type, output_folder, use_normalized, selected_fit)
+        plot_heatmap(data_folder, txt_files, wavenumber_min, wavenumber_max, plot_type, output_folder, use_normalized, selected_fit, log_scale=log_scale)
         messagebox.showinfo("Success", "Plots created successfully!")
     except Exception as e:
         messagebox.showerror("Error", str(e))
@@ -257,13 +261,17 @@ tk.Label(root, text="Perform Fitting:").grid(row=6, column=0, padx=10, pady=5)
 var_fitting = tk.BooleanVar(value=True)
 tk.Checkbutton(root, variable=var_fitting).grid(row=6, column=1, padx=10, pady=5)
 
+tk.Label(root, text="Use log scale:").grid(row=7, column=0, padx=10, pady=5)
+var_log = tk.BooleanVar(value=False)
+tk.Checkbutton(root, variable=var_log).grid(row=7, column=1, padx=10, pady=5)
+
 # 添加选择框用于选择拟合线型
-tk.Label(root, text="Fit Type:").grid(row=7, column=0, padx=10, pady=5)
+tk.Label(root, text="Fit Type:").grid(row=8, column=0, padx=10, pady=5)
 var_fit_type = tk.StringVar(value="None")
-ttk.Combobox(root, width=15, textvariable=var_fit_type, values=["Gaussian", "Lorentzian", "Double Lorentz","Double Gaussian", "Voigt"]).grid(row=7, column=1, padx=10, pady=5)
+ttk.Combobox(root, width=15, textvariable=var_fit_type, values=["Gaussian", "Lorentzian", "Double Lorentz","Double Gaussian", "Voigt"]).grid(row=8, column=1, padx=10, pady=5)
 
 # 调整运行按钮的位置
-tk.Button(root, text="Run", command=run_plot).grid(row=8, column=0, columnspan=3, pady=10)
+tk.Button(root, text="Run", command=run_plot).grid(row=9, column=0, columnspan=3, pady=10)
 
 # 运行主循环
 root.mainloop()
