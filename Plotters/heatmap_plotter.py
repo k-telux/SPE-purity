@@ -5,11 +5,35 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import tkinter as tk
 from scipy.ndimage import gaussian_filter1d
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox, ttk, filedialog
 from scipy.optimize import curve_fit
 from scipy.special import wofz
 from scipy.fft import fft, ifft
 import math
+
+def ask_save_data(output_folder):
+    root = tk.Tk()
+    root.withdraw()  
+    result = messagebox.askyesno("Save(warning, the file name will auto change to the point's position)", "Save the spectrum of this point?")
+    if result:
+        file_path = filedialog.asksaveasfilename(
+            defaultextension=".txt",
+            filetypes=[("Text files", "*.txt")],
+            initialdir=output_folder,  # 使用 output_folder 作为默认保存路径
+            title="Save spectrum data"
+        )
+        root.destroy()
+        return file_path
+    root.destroy()
+    return None
+
+def save_data_to_txt(x_data, y_data, x_point, y_point, file_path):
+    filename = f"spectrum_data_x{x_point}_y{y_point}.txt"
+    full_path = os.path.join(os.path.dirname(file_path), filename)
+    with open(full_path, 'w') as file:
+        for x, y in zip(x_data, y_data):
+            file.write(f"{x}\t{y}\n")
+    print(f"Data is saved to {full_path}")
 
 def gaussian(x, amp, cen, wid):
     return amp * np.exp(-(x-cen)**2 / (2*wid**2))
@@ -47,7 +71,7 @@ def smooth_move(data, window_size):
         data = data.values
     return np.convolve(data, np.ones(window_size)/window_size, mode='valid')
 
-def plot_spectrum(df, x_point, y_point, plot_type, perform_fitting, selected_fit=None):
+def plot_spectrum(df, x_point, y_point, plot_type, perform_fitting, output_folder, selected_fit=None):
     print(f"Looking for data at (x={x_point}, y={y_point}) in the dataframe. fit: {selected_fit}")
     point_data = df[(df['x'] == y_point) & (df['y'] == x_point)]
     if not point_data.empty:
@@ -112,10 +136,14 @@ def plot_spectrum(df, x_point, y_point, plot_type, perform_fitting, selected_fit
         plt.title(f'Intensity at (x={x_point}, y={y_point})')
         plt.legend()
         plt.show()
+
+        file_path = ask_save_data(output_folder)
+        if file_path:
+            save_data_to_txt(x_data, y_data,x_point,y_point, file_path)
     else:
         print(f"No data found at (x={x_point}, y={y_point})")
 
-def on_click(event, heatmap_data, df, plot_type, perform_fitting, selected_fit):
+def on_click(event, heatmap_data, df, plot_type, perform_fitting,output_folder, selected_fit):
     if event.xdata is None or event.ydata is None:
         print("Click outside axes bounds. Ignoring click.")
         return
@@ -129,7 +157,7 @@ def on_click(event, heatmap_data, df, plot_type, perform_fitting, selected_fit):
         x_point = heatmap_data.columns[col]
         y_point = heatmap_data.index[row]
         print(f"Plotting spectrum at (x={x_point}, y={y_point})")
-        plot_spectrum(df, x_point, y_point, plot_type, perform_fitting, selected_fit)
+        plot_spectrum(df, x_point, y_point, plot_type, perform_fitting,output_folder, selected_fit)
     else:
         print(f"Click out of data bounds (col: {col}, row: {row}). Ignoring click.")
 
@@ -183,7 +211,7 @@ def plot_heatmap(data_folder, txt_files, wavenumber_min=1.6, wavenumber_max=2.2,
 
         ax.format_coord = format_coord
         # Bind the click event
-        ax.figure.canvas.mpl_connect('button_press_event', lambda event: on_click(event, heatmap_data, df, plot_type, perform_fitting, selected_fit))
+        ax.figure.canvas.mpl_connect('button_press_event', lambda event: on_click(event, heatmap_data, df, plot_type, perform_fitting,output_folder, selected_fit))
 
         plt.show()
         plt.close()
